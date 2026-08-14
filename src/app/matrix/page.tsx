@@ -28,7 +28,7 @@ export default async function MatrixPage({
 
   const { data: tasks } = await supabase
     .from("tasks")
-    .select("id, title")
+    .select("id, title, default_time")
     .eq("type", "recurring")
     .order("created_at", { ascending: true });
 
@@ -67,41 +67,26 @@ export default async function MatrixPage({
     occurrenceByTaskAndDate[`${occurrence.task_id}:${occurrence.scheduled_date}`] = occurrence;
   }
 
-  // Bidirectional move provenance: for occurrences moved away, look up where they
-  // went; for occurrences that arrived via a move, look up where they came from.
+  // Recurring tasks no longer support moving occurrences from the Matrix
+  // (see project decision — Move only makes sense for one-off tasks in Day
+  // view). This still resolves a destination date for any occurrence with a
+  // legacy status of "moved" from before that change, so old data renders
+  // sensibly instead of as a broken checkbox.
   const movedAwayIds = (windowOccurrences ?? [])
     .filter((o) => o.status === "moved")
     .map((o) => o.id);
-  const movedInSourceIds = (windowOccurrences ?? [])
-    .filter((o) => o.moved_from_occurrence_id)
-    .map((o) => o.moved_from_occurrence_id as string);
 
-  const [{ data: movedToRows }, { data: movedFromRows }] = await Promise.all([
-    movedAwayIds.length
-      ? supabase
-          .from("task_occurrences")
-          .select("scheduled_date, moved_from_occurrence_id")
-          .in("moved_from_occurrence_id", movedAwayIds)
-      : Promise.resolve({ data: [] as { scheduled_date: string; moved_from_occurrence_id: string }[] }),
-    movedInSourceIds.length
-      ? supabase.from("task_occurrences").select("id, scheduled_date").in("id", movedInSourceIds)
-      : Promise.resolve({ data: [] as { id: string; scheduled_date: string }[] }),
-  ]);
+  const { data: movedToRows } = movedAwayIds.length
+    ? await supabase
+        .from("task_occurrences")
+        .select("scheduled_date, moved_from_occurrence_id")
+        .in("moved_from_occurrence_id", movedAwayIds)
+    : { data: [] as { scheduled_date: string; moved_from_occurrence_id: string }[] };
 
   const movedToDateByOccurrenceId: Record<string, string> = {};
   for (const row of movedToRows ?? []) {
     if (row.moved_from_occurrence_id) {
       movedToDateByOccurrenceId[row.moved_from_occurrence_id] = row.scheduled_date;
-    }
-  }
-  const movedFromDateById: Record<string, string> = {};
-  for (const row of movedFromRows ?? []) {
-    movedFromDateById[row.id] = row.scheduled_date;
-  }
-  const movedFromDateByOccurrenceId: Record<string, string> = {};
-  for (const occurrence of windowOccurrences ?? []) {
-    if (occurrence.moved_from_occurrence_id && movedFromDateById[occurrence.moved_from_occurrence_id]) {
-      movedFromDateByOccurrenceId[occurrence.id] = movedFromDateById[occurrence.moved_from_occurrence_id];
     }
   }
 
@@ -128,7 +113,6 @@ export default async function MatrixPage({
         occurrenceByTaskAndDate={occurrenceByTaskAndDate}
         streaksByTask={streaksByTask}
         movedToDateByOccurrenceId={movedToDateByOccurrenceId}
-        movedFromDateByOccurrenceId={movedFromDateByOccurrenceId}
       />
     </main>
   );

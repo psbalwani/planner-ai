@@ -71,7 +71,7 @@ export default function DayList({
                 <button
                   title="Delete task"
                   onClick={() => deleteTask(occurrence.task_id, occurrence.tasks?.title ?? "this task")}
-                  className="text-line transition-colors hover:text-red-600"
+                  className="text-muted transition-colors hover:text-red-600"
                 >
                   <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
                     <path
@@ -142,6 +142,14 @@ export default function DayList({
                 className="rounded-lg border border-line px-2.5 py-1 text-xs text-muted hover:text-ink disabled:opacity-50"
               >
                 Move
+              </button>
+              <button
+                onClick={() =>
+                  deleteTask(occurrence.task_id, occurrence.tasks?.title ?? "this task")
+                }
+                className="rounded-lg border border-line px-2.5 py-1 text-xs text-muted hover:border-red-300 hover:text-red-600"
+              >
+                Delete
               </button>
             </div>
           )}

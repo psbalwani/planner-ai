@@ -1,13 +1,13 @@
-import type { TimeOfDayInsight } from "@/lib/insight";
+import type { BucketedInsight } from "@/lib/insight";
 
-export default function InsightCard({ insight }: { insight: TimeOfDayInsight }) {
+export default function InsightCard({ title, insight }: { title: string; insight: BucketedInsight }) {
   return (
     <div className="mb-6 rounded-2xl border border-line bg-surface p-4 shadow-card">
-      <p className="text-xs font-medium uppercase tracking-wide text-warm">Insight</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-warm">{title}</p>
       <p className="mt-1 text-sm text-ink">
-        You complete <span className="font-semibold">{insight.strongest.label.toLowerCase()}</span>-scheduled
-        tasks {insight.gapPercent} points more often than{" "}
-        <span className="font-semibold">{insight.weakest.label.toLowerCase()}</span>-scheduled ones.
+        You complete <span className="font-semibold">{insight.strongest.label}</span> tasks{" "}
+        {insight.gapPercent} points more often than{" "}
+        <span className="font-semibold">{insight.weakest.label}</span> tasks.
       </p>
       <div className="mt-3 flex gap-4">
         {insight.buckets.map((bucket) => (

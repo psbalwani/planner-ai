@@ -7,12 +7,11 @@ import { formatDayLabel } from "@/lib/dates";
 import CheckboxToggle from "@/components/checkbox-toggle";
 
 interface MatrixGridProps {
-  tasks: Pick<Task, "id" | "title">[];
+  tasks: Pick<Task, "id" | "title" | "default_time">[];
   days: string[];
   occurrenceByTaskAndDate: Record<string, TaskOccurrence>;
   streaksByTask: Record<string, number>;
   movedToDateByOccurrenceId: Record<string, string>;
-  movedFromDateByOccurrenceId: Record<string, string>;
 }
 
 function MoveIcon() {
@@ -35,12 +34,10 @@ export default function MatrixGrid({
   occurrenceByTaskAndDate,
   streaksByTask,
   movedToDateByOccurrenceId,
-  movedFromDateByOccurrenceId,
 }: MatrixGridProps) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [movingId, setMovingId] = useState<string | null>(null);
-  const [moveTarget, setMoveTarget] = useState("");
+  const [timeOverrides, setTimeOverrides] = useState<Record<string, string>>({});
 
   async function toggle(occurrence: TaskOccurrence) {
     setPendingId(occurrence.id);
@@ -60,16 +57,13 @@ export default function MatrixGrid({
     router.refresh();
   }
 
-  async function move(occurrence: TaskOccurrence) {
-    if (!moveTarget) return;
-    setPendingId(occurrence.id);
-    await fetch(`/api/occurrences/${occurrence.id}`, {
+  async function updateTime(taskId: string, time: string) {
+    setTimeOverrides((prev) => ({ ...prev, [taskId]: time }));
+    await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "move", new_date: moveTarget }),
+      body: JSON.stringify({ default_time: time || null }),
     });
-    setPendingId(null);
-    setMovingId(null);
     router.refresh();
   }
 
@@ -90,6 +84,7 @@ export default function MatrixGrid({
         <thead>
           <tr>
             <th className="px-4 py-3 text-left font-medium text-muted">Task</th>
+            <th className="px-2 py-3 text-center font-medium text-muted">Time</th>
             {days.map((day) => (
               <th key={day} className="px-2 py-3 text-center font-mono text-xs font-normal text-muted">
                 {formatDayLabel(day)}
@@ -102,12 +97,12 @@ export default function MatrixGrid({
           {tasks.map((task) => (
             <tr key={task.id} className="border-t border-line">
               <td className="px-4 py-3 font-medium text-ink">
-                <span className="inline-flex items-center gap-1.5">
-                  {task.title}
+                <div className="flex items-start justify-between gap-2">
+                  <span>{task.title}</span>
                   <button
                     title="Delete task"
                     onClick={() => deleteTask(task.id, task.title)}
-                    className="text-line transition-colors hover:text-red-600"
+                    className="mt-0.5 shrink-0 text-muted transition-colors hover:text-red-600"
                   >
                     <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
                       <path
@@ -119,7 +114,15 @@ export default function MatrixGrid({
                       />
                     </svg>
                   </button>
-                </span>
+                </div>
+              </td>
+              <td className="px-2 py-3 text-center">
+                <input
+                  type="time"
+                  value={timeOverrides[task.id] ?? task.default_time ?? ""}
+                  onChange={(e) => updateTime(task.id, e.target.value)}
+                  className="rounded-md border border-line bg-bg px-1.5 py-1 text-xs text-ink"
+                />
               </td>
               {days.map((day) => {
                 const occurrence = occurrenceByTaskAndDate[`${task.id}:${day}`];
@@ -138,49 +141,12 @@ export default function MatrixGrid({
                       >
                         <MoveIcon />
                       </span>
-                    ) : movingId === occurrence.id ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <input
-                          type="date"
-                          value={moveTarget}
-                          onChange={(e) => setMoveTarget(e.target.value)}
-                          className="w-[110px] rounded border border-line px-1 py-0.5 text-xs"
-                        />
-                        <button
-                          disabled={!moveTarget || pendingId === occurrence.id}
-                          onClick={() => move(occurrence)}
-                          className="rounded bg-accent px-1.5 py-0.5 text-xs text-white disabled:opacity-50"
-                        >
-                          Go
-                        </button>
-                        <button onClick={() => setMovingId(null)} className="text-xs text-muted">
-                          ✕
-                        </button>
-                      </div>
                     ) : (
-                      <div className="flex items-center justify-center gap-1">
-                        <CheckboxToggle
-                          checked={occurrence.status === "done"}
-                          disabled={pendingId === occurrence.id}
-                          onToggle={() => toggle(occurrence)}
-                        />
-                        <button
-                          title={
-                            movedFromDateByOccurrenceId[occurrence.id]
-                              ? `Moved from ${formatDayLabel(movedFromDateByOccurrenceId[occurrence.id])} — move again`
-                              : "Move to another day"
-                          }
-                          onClick={() => {
-                            setMovingId(occurrence.id);
-                            setMoveTarget("");
-                          }}
-                          className={`transition-colors hover:text-ink ${
-                            movedFromDateByOccurrenceId[occurrence.id] ? "text-warm" : "text-line"
-                          }`}
-                        >
-                          <MoveIcon />
-                        </button>
-                      </div>
+                      <CheckboxToggle
+                        checked={occurrence.status === "done"}
+                        disabled={pendingId === occurrence.id}
+                        onToggle={() => toggle(occurrence)}
+                      />
                     )}
                   </td>
                 );

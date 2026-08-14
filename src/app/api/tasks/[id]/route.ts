@@ -50,6 +50,21 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Carry a time change onto not-yet-resolved occurrences so the new
+  // schedule applies right away, without rewriting the historical record of
+  // when already-completed/skipped occurrences were actually planned.
+  if ("default_time" in patch) {
+    const { error: occurrenceError } = await supabase
+      .from("task_occurrences")
+      .update({ scheduled_time: patch.default_time })
+      .eq("task_id", id)
+      .eq("status", "pending");
+    if (occurrenceError) {
+      return NextResponse.json({ error: occurrenceError.message }, { status: 500 });
+    }
+  }
+
   return NextResponse.json({ task: data });
 }
 
