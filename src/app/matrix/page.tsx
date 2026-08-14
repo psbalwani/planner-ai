@@ -3,9 +3,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, startOfWeek, todayISO } from "@/lib/dates";
 import { computeCurrentStreak } from "@/lib/streak";
+import { computeTimeOfDayInsight } from "@/lib/insight";
 import AppHeader from "@/components/app-header";
 import MatrixGrid from "./matrix-grid";
 import NewRecurringTaskForm from "./new-recurring-task-form";
+import InsightCard from "./insight-card";
+import SeedDemoButton from "./seed-demo-button";
 import type { TaskOccurrence } from "@/types/database";
 
 const WEEK_LENGTH = 7;
@@ -67,22 +70,68 @@ export default async function MatrixPage({
     occurrenceByTaskAndDate[`${occurrence.task_id}:${occurrence.scheduled_date}`] = occurrence;
   }
 
+  // Bidirectional move provenance: for occurrences moved away, look up where they
+  // went; for occurrences that arrived via a move, look up where they came from.
+  const movedAwayIds = (windowOccurrences ?? [])
+    .filter((o) => o.status === "moved")
+    .map((o) => o.id);
+  const movedInSourceIds = (windowOccurrences ?? [])
+    .filter((o) => o.moved_from_occurrence_id)
+    .map((o) => o.moved_from_occurrence_id as string);
+
+  const [{ data: movedToRows }, { data: movedFromRows }] = await Promise.all([
+    movedAwayIds.length
+      ? supabase
+          .from("task_occurrences")
+          .select("scheduled_date, moved_from_occurrence_id")
+          .in("moved_from_occurrence_id", movedAwayIds)
+      : Promise.resolve({ data: [] as { scheduled_date: string; moved_from_occurrence_id: string }[] }),
+    movedInSourceIds.length
+      ? supabase.from("task_occurrences").select("id, scheduled_date").in("id", movedInSourceIds)
+      : Promise.resolve({ data: [] as { id: string; scheduled_date: string }[] }),
+  ]);
+
+  const movedToDateByOccurrenceId: Record<string, string> = {};
+  for (const row of movedToRows ?? []) {
+    if (row.moved_from_occurrence_id) {
+      movedToDateByOccurrenceId[row.moved_from_occurrence_id] = row.scheduled_date;
+    }
+  }
+  const movedFromDateById: Record<string, string> = {};
+  for (const row of movedFromRows ?? []) {
+    movedFromDateById[row.id] = row.scheduled_date;
+  }
+  const movedFromDateByOccurrenceId: Record<string, string> = {};
+  for (const occurrence of windowOccurrences ?? []) {
+    if (occurrence.moved_from_occurrence_id && movedFromDateById[occurrence.moved_from_occurrence_id]) {
+      movedFromDateByOccurrenceId[occurrence.id] = movedFromDateById[occurrence.moved_from_occurrence_id];
+    }
+  }
+
+  // Across all tasks (recurring + one-off), not just this week's window —
+  // the insight needs as much history as exists to have any chance of signal.
+  const { data: allHistoryOccurrences } = await supabase
+    .from("task_occurrences")
+    .select("scheduled_time, status")
+    .lte("scheduled_date", today);
+  const insight = computeTimeOfDayInsight(allHistoryOccurrences ?? []);
+
   return (
     <main className="mx-auto max-w-4xl p-6">
       <AppHeader active="matrix" />
-      <h1 className="mt-4 text-xl font-semibold">Matrix</h1>
-      <p className="mb-6 text-sm text-neutral-500">
-        Recurring tasks. Check off a day, watch the streak.
-      </p>
+      <h1 className="mt-5 text-xl font-semibold text-ink">Matrix</h1>
+      <p className="mb-6 text-sm text-muted">Recurring tasks. Check off a day, watch the streak.</p>
 
       <div className="mb-4 flex items-center justify-between text-sm">
-        <Link href={`/matrix?start=${addDays(weekStart, -7)}`} className="text-neutral-500 hover:text-neutral-900">
+        <Link href={`/matrix?start=${addDays(weekStart, -7)}`} className="text-muted hover:text-ink">
           ← Previous week
         </Link>
-        <Link href={`/matrix?start=${addDays(weekStart, 7)}`} className="text-neutral-500 hover:text-neutral-900">
+        <Link href={`/matrix?start=${addDays(weekStart, 7)}`} className="text-muted hover:text-ink">
           Next week →
         </Link>
       </div>
+
+      {insight ? <InsightCard insight={insight} /> : <SeedDemoButton />}
 
       <NewRecurringTaskForm />
 
@@ -91,6 +140,8 @@ export default async function MatrixPage({
         days={days}
         occurrenceByTaskAndDate={occurrenceByTaskAndDate}
         streaksByTask={streaksByTask}
+        movedToDateByOccurrenceId={movedToDateByOccurrenceId}
+        movedFromDateByOccurrenceId={movedFromDateByOccurrenceId}
       />
     </main>
   );

@@ -43,24 +43,24 @@ export default function NewRecurringTaskForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="mb-6 flex flex-col gap-3 rounded border border-neutral-200 p-3"
+      className="mb-6 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-card"
     >
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="New recurring task (e.g. Exercise)"
-        className="rounded border border-neutral-300 px-3 py-2"
+        className="rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted"
       />
-      <div className="flex flex-wrap gap-2 text-sm">
+      <div className="flex flex-wrap gap-1.5 text-xs font-mono">
         {DAYS.map((day) => (
           <button
             type="button"
             key={day}
             onClick={() => toggleDay(day)}
-            className={`rounded border px-2 py-1 ${
+            className={`rounded-md border px-2.5 py-1 transition-colors ${
               selectedDays.includes(day)
-                ? "border-neutral-900 bg-neutral-900 text-white"
-                : "border-neutral-300 text-neutral-600"
+                ? "border-accent bg-accent text-white"
+                : "border-line text-muted hover:border-accent/50 hover:text-ink"
             }`}
           >
             {day}
@@ -70,7 +70,7 @@ export default function NewRecurringTaskForm() {
       <button
         type="submit"
         disabled={submitting || !title.trim() || selectedDays.length === 0}
-        className="self-start rounded bg-neutral-900 px-3 py-2 text-sm text-white disabled:opacity-50"
+        className="self-start rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
       >
         Add recurring task
       </button>
