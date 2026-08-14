@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 type Action =
   | { action: "complete"; note?: string }
   | { action: "skip" }
-  | { action: "move"; new_date: string };
+  | { action: "move"; new_date: string }
+  | { action: "reopen" };
 
 // Completion writes an append-only CompletionEvent (the ground truth for
 // future adaptive-planning features) and denormalizes status onto the
@@ -55,6 +56,28 @@ export async function PATCH(
     const { data, error } = await supabase
       .from("task_occurrences")
       .update({ status: "skipped" })
+      .eq("id", occurrence.id)
+      .select()
+      .single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ occurrence: data });
+  }
+
+  if (body.action === "reopen") {
+    // Undoes a mistaken complete/skip. Deletes any completion_events tied to
+    // this occurrence too — leaving them would corrupt the behavioral log
+    // that adaptive planning depends on (docs/prd.md's non-negotiable
+    // principle), since a "done" event would remain for an occurrence that's
+    // actually pending again.
+    const { error: eventError } = await supabase
+      .from("completion_events")
+      .delete()
+      .eq("occurrence_id", occurrence.id);
+    if (eventError) return NextResponse.json({ error: eventError.message }, { status: 500 });
+
+    const { data, error } = await supabase
+      .from("task_occurrences")
+      .update({ status: "pending" })
       .eq("id", occurrence.id)
       .select()
       .single();
