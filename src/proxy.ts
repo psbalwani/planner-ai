@@ -27,11 +27,14 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
-    request.nextUrl.pathname.startsWith("/auth");
+  const { pathname } = request.nextUrl;
+  const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/auth");
+  const isApiRoute = pathname.startsWith("/api");
 
   if (!user && !isAuthRoute) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
