@@ -40,8 +40,21 @@ export default function DayList({
     router.refresh();
   }
 
+  async function deleteTask(taskId: string, title: string) {
+    if (!window.confirm(`Delete "${title}"? This removes all its history.`)) return;
+    await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+    router.refresh();
+  }
+
   if (occurrences.length === 0) {
-    return <p className="text-sm text-muted">Nothing scheduled.</p>;
+    return (
+      <div className="rounded-2xl border border-dashed border-line bg-surface p-6 text-center">
+        <p className="text-sm text-ink">Nothing scheduled for this day.</p>
+        <p className="mt-1 text-xs text-muted">
+          Add a one-off task above, or jump to the Matrix for recurring ones.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -53,7 +66,24 @@ export default function DayList({
         >
           <div className="flex items-center justify-between">
             <div>
-              <span className="font-medium text-ink">{occurrence.tasks?.title}</span>{" "}
+              <span className="inline-flex items-center gap-1.5">
+                <span className="font-medium text-ink">{occurrence.tasks?.title}</span>
+                <button
+                  title="Delete task"
+                  onClick={() => deleteTask(occurrence.task_id, occurrence.tasks?.title ?? "this task")}
+                  className="text-line transition-colors hover:text-red-600"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+                    <path
+                      d="M3 4.5h10M6 4.5V3h4v1.5M4.5 4.5l.5 8.5h6l.5-8.5"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </span>{" "}
               {occurrence.scheduled_time && (
                 <span className="font-mono text-xs text-muted">{occurrence.scheduled_time}</span>
               )}

@@ -3,12 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, startOfWeek, todayISO } from "@/lib/dates";
 import { computeCurrentStreak } from "@/lib/streak";
-import { computeTimeOfDayInsight } from "@/lib/insight";
 import AppHeader from "@/components/app-header";
 import MatrixGrid from "./matrix-grid";
 import NewRecurringTaskForm from "./new-recurring-task-form";
-import InsightCard from "./insight-card";
-import SeedDemoButton from "./seed-demo-button";
 import type { TaskOccurrence } from "@/types/database";
 
 const WEEK_LENGTH = 7;
@@ -108,14 +105,6 @@ export default async function MatrixPage({
     }
   }
 
-  // Across all tasks (recurring + one-off), not just this week's window —
-  // the insight needs as much history as exists to have any chance of signal.
-  const { data: allHistoryOccurrences } = await supabase
-    .from("task_occurrences")
-    .select("scheduled_time, status")
-    .lte("scheduled_date", today);
-  const insight = computeTimeOfDayInsight(allHistoryOccurrences ?? []);
-
   return (
     <main className="mx-auto max-w-4xl p-6">
       <AppHeader active="matrix" />
@@ -130,8 +119,6 @@ export default async function MatrixPage({
           Next week →
         </Link>
       </div>
-
-      {insight ? <InsightCard insight={insight} /> : <SeedDemoButton />}
 
       <NewRecurringTaskForm />
 

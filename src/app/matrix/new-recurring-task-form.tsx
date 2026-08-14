@@ -10,6 +10,7 @@ const DAYS: DayOfWeek[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 export default function NewRecurringTaskForm() {
   const router = useRouter();
   const [title, setTitle] = useState("");
+  const [time, setTime] = useState("");
   const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,6 +28,7 @@ export default function NewRecurringTaskForm() {
       body: JSON.stringify({
         title,
         type: "recurring",
+        default_time: time || undefined,
         recurrence: {
           frequency: "custom",
           days_of_week: selectedDays,
@@ -35,6 +37,7 @@ export default function NewRecurringTaskForm() {
       }),
     });
     setTitle("");
+    setTime("");
     setSelectedDays([]);
     setSubmitting(false);
     router.refresh();
@@ -45,12 +48,21 @@ export default function NewRecurringTaskForm() {
       onSubmit={handleSubmit}
       className="mb-6 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-card"
     >
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="New recurring task (e.g. Exercise)"
-        className="rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted"
-      />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="New recurring task (e.g. Exercise)"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink placeholder:text-muted"
+        />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+          title="Time (optional)"
+          className="shrink-0 rounded-lg border border-line bg-bg px-2 py-2 text-sm text-ink"
+        />
+      </div>
       <div className="flex flex-wrap gap-1.5 text-xs font-mono">
         {DAYS.map((day) => (
           <button

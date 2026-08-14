@@ -56,3 +56,13 @@ export interface Goal {
   target_date: string | null;
   created_at: string;
 }
+
+export interface FocusSession {
+  id: string;
+  user_id: string;
+  task_id: string | null;
+  duration_minutes: number;
+  started_at: string; // ISO timestamp
+  ended_at: string | null;
+  completed: boolean;
+}

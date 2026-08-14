@@ -74,7 +74,14 @@ export default function MatrixGrid({
   }
 
   if (tasks.length === 0) {
-    return <p className="text-sm text-muted">No recurring tasks yet.</p>;
+    return (
+      <div className="rounded-2xl border border-dashed border-line bg-surface p-6 text-center">
+        <p className="text-sm text-ink">No recurring tasks yet.</p>
+        <p className="mt-1 text-xs text-muted">
+          Add one above — daily habits, weekly routines, anything you want a streak for.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -93,14 +100,14 @@ export default function MatrixGrid({
         </thead>
         <tbody>
           {tasks.map((task) => (
-            <tr key={task.id} className="group/row border-t border-line">
+            <tr key={task.id} className="border-t border-line">
               <td className="px-4 py-3 font-medium text-ink">
                 <span className="inline-flex items-center gap-1.5">
                   {task.title}
                   <button
                     title="Delete task"
                     onClick={() => deleteTask(task.id, task.title)}
-                    className="text-muted opacity-0 transition-opacity hover:text-red-600 group-hover/row:opacity-100"
+                    className="text-line transition-colors hover:text-red-600"
                   >
                     <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
                       <path
@@ -117,7 +124,7 @@ export default function MatrixGrid({
               {days.map((day) => {
                 const occurrence = occurrenceByTaskAndDate[`${task.id}:${day}`];
                 return (
-                  <td key={day} className="group px-2 py-3 text-center">
+                  <td key={day} className="px-2 py-3 text-center">
                     {!occurrence ? (
                       <span className="text-line">·</span>
                     ) : occurrence.status === "moved" ? (
@@ -167,8 +174,8 @@ export default function MatrixGrid({
                             setMovingId(occurrence.id);
                             setMoveTarget("");
                           }}
-                          className={`text-muted opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 ${
-                            movedFromDateByOccurrenceId[occurrence.id] ? "text-warm opacity-100" : ""
+                          className={`transition-colors hover:text-ink ${
+                            movedFromDateByOccurrenceId[occurrence.id] ? "text-warm" : "text-line"
                           }`}
                         >
                           <MoveIcon />
