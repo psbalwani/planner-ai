@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, JetBrains_Mono } from "next/font/google";
+import { ToastProvider } from "@/components/toast-provider";
 import "./globals.css";
 
 const sans = Manrope({
@@ -26,7 +27,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body className="bg-bg font-sans text-ink antialiased">{children}</body>
+      <body className="bg-bg font-sans text-ink antialiased">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

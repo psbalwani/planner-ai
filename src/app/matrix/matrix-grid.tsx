@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Task, TaskOccurrence } from "@/types/database";
 import { formatDayLabel } from "@/lib/dates";
+import { apiFetch, toErrorMessage } from "@/lib/api";
+import { useToast } from "@/components/toast-provider";
 import CheckboxToggle from "@/components/checkbox-toggle";
 
 interface MatrixGridProps {
@@ -11,6 +13,8 @@ interface MatrixGridProps {
   days: string[];
   occurrenceByTaskAndDate: Record<string, TaskOccurrence>;
   streaksByTask: Record<string, number>;
+  bestStreaksByTask: Record<string, number>;
+  dependsOnTitleByTaskId: Record<string, string>;
   movedToDateByOccurrenceId: Record<string, string>;
 }
 
@@ -28,43 +32,74 @@ function MoveIcon() {
   );
 }
 
+function FireIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      className={`h-4 w-4 ${active ? "text-warm" : "text-line"}`}
+      fill={active ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={active ? 0 : 1.2}
+      strokeLinejoin="round"
+    >
+      <path d="M8 1.3c-.3 2-2.4 3.4-2.4 6.2A2.4 2.4 0 108 5.1c1.6 1 2.4 2.7 2.4 4.4A4.4 4.4 0 113.6 9.5c0-3.3 2.4-4.8 3.1-6.6.2-.5.7-1.1 1.3-1.6Z" />
+    </svg>
+  );
+}
+
 export default function MatrixGrid({
   tasks,
   days,
   occurrenceByTaskAndDate,
   streaksByTask,
+  bestStreaksByTask,
+  dependsOnTitleByTaskId,
   movedToDateByOccurrenceId,
 }: MatrixGridProps) {
   const router = useRouter();
+  const showError = useToast();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [timeOverrides, setTimeOverrides] = useState<Record<string, string>>({});
 
   async function toggle(occurrence: TaskOccurrence) {
     setPendingId(occurrence.id);
-    const action = occurrence.status === "done" ? "reopen" : "complete";
-    await fetch(`/api/occurrences/${occurrence.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action }),
-    });
-    setPendingId(null);
-    router.refresh();
+    try {
+      const action = occurrence.status === "done" ? "reopen" : "complete";
+      await apiFetch(`/api/occurrences/${occurrence.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    } finally {
+      setPendingId(null);
+    }
   }
 
   async function deleteTask(taskId: string, title: string) {
     if (!window.confirm(`Delete "${title}"? This removes all its history.`)) return;
-    await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-    router.refresh();
+    try {
+      await apiFetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    }
   }
 
   async function updateTime(taskId: string, time: string) {
     setTimeOverrides((prev) => ({ ...prev, [taskId]: time }));
-    await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ default_time: time || null }),
-    });
-    router.refresh();
+    try {
+      await apiFetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ default_time: time || null }),
+      });
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    }
   }
 
   if (tasks.length === 0) {
@@ -115,6 +150,11 @@ export default function MatrixGrid({
                     </svg>
                   </button>
                 </div>
+                {dependsOnTitleByTaskId[task.id] && (
+                  <p className="mt-0.5 text-[10px] font-normal text-muted">
+                    depends on: {dependsOnTitleByTaskId[task.id]}
+                  </p>
+                )}
               </td>
               <td className="px-2 py-3 text-center">
                 <input
@@ -151,8 +191,20 @@ export default function MatrixGrid({
                   </td>
                 );
               })}
-              <td className="px-4 py-3 text-center font-mono font-semibold text-warm">
-                {streaksByTask[task.id] ?? 0}
+              <td className="px-4 py-3 text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <FireIcon active={(streaksByTask[task.id] ?? 0) > 0} />
+                  <span
+                    className={`font-mono font-semibold ${
+                      (streaksByTask[task.id] ?? 0) > 0 ? "text-warm" : "text-muted"
+                    }`}
+                  >
+                    {streaksByTask[task.id] ?? 0}
+                  </span>
+                </div>
+                {(bestStreaksByTask[task.id] ?? 0) > (streaksByTask[task.id] ?? 0) && (
+                  <p className="font-mono text-[10px] text-muted">best {bestStreaksByTask[task.id]}</p>
+                )}
               </td>
             </tr>
           ))}

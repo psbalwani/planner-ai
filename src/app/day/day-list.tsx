@@ -4,9 +4,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { TaskOccurrence } from "@/types/database";
 import { formatDayLabel } from "@/lib/dates";
+import { apiFetch, toErrorMessage } from "@/lib/api";
+import { useToast } from "@/components/toast-provider";
 
 export interface DayListOccurrence extends TaskOccurrence {
-  tasks: { id: string; title: string } | null;
+  tasks: { id: string; title: string; depends_on_task_id: string | null } | null;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -20,30 +22,42 @@ export default function DayList({
   occurrences,
   movedToDateByOccurrenceId,
   movedFromDateByOccurrenceId,
+  dependsOnTitleByOccurrenceId,
 }: {
   occurrences: DayListOccurrence[];
   movedToDateByOccurrenceId: Record<string, string>;
   movedFromDateByOccurrenceId: Record<string, string>;
+  dependsOnTitleByOccurrenceId: Record<string, string>;
 }) {
   const router = useRouter();
+  const showError = useToast();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [moveTargets, setMoveTargets] = useState<Record<string, string>>({});
 
   async function act(id: string, body: Record<string, unknown>) {
     setPendingId(id);
-    await fetch(`/api/occurrences/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setPendingId(null);
-    router.refresh();
+    try {
+      await apiFetch(`/api/occurrences/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    } finally {
+      setPendingId(null);
+    }
   }
 
   async function deleteTask(taskId: string, title: string) {
     if (!window.confirm(`Delete "${title}"? This removes all its history.`)) return;
-    await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-    router.refresh();
+    try {
+      await apiFetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    }
   }
 
   if (occurrences.length === 0) {
@@ -109,6 +123,11 @@ export default function DayList({
           {occurrence.status === "moved" && movedToDateByOccurrenceId[occurrence.id] && (
             <p className="mt-1 text-xs text-warm">
               → moved to {formatDayLabel(movedToDateByOccurrenceId[occurrence.id])}
+            </p>
+          )}
+          {dependsOnTitleByOccurrenceId[occurrence.id] && (
+            <p className="mt-1 text-xs text-muted">
+              depends on: {dependsOnTitleByOccurrenceId[occurrence.id]}
             </p>
           )}
 

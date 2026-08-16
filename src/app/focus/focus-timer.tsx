@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch, toErrorMessage } from "@/lib/api";
+import { useToast } from "@/components/toast-provider";
 
 const PRESETS = [15, 25, 45];
 
@@ -13,6 +15,7 @@ function formatTime(totalSeconds: number): string {
 
 export default function FocusTimer({ tasks }: { tasks: { id: string; title: string }[] }) {
   const router = useRouter();
+  const showError = useToast();
   const [taskId, setTaskId] = useState("");
   const [workMinutes, setWorkMinutes] = useState(25);
   const [phase, setPhase] = useState<"idle" | "work" | "break">("idle");
@@ -40,28 +43,36 @@ export default function FocusTimer({ tasks }: { tasks: { id: string; title: stri
   }
 
   async function start() {
-    const res = await fetch("/api/focus-sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task_id: taskId || undefined, duration_minutes: workMinutes }),
-    });
-    const { session } = await res.json();
-    sessionIdRef.current = session.id;
-    setPhase("work");
-    setSecondsLeft(workMinutes * 60);
-    countDown(finishWork);
+    try {
+      const res = await apiFetch("/api/focus-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_id: taskId || undefined, duration_minutes: workMinutes }),
+      });
+      const { session } = await res.json();
+      sessionIdRef.current = session.id;
+      setPhase("work");
+      setSecondsLeft(workMinutes * 60);
+      countDown(finishWork);
+    } catch (err) {
+      showError(toErrorMessage(err));
+    }
   }
 
   async function finishWork() {
     if (sessionIdRef.current) {
-      await fetch(`/api/focus-sessions/${sessionIdRef.current}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: true }),
-      });
+      try {
+        await apiFetch(`/api/focus-sessions/${sessionIdRef.current}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ completed: true }),
+        });
+        router.refresh();
+      } catch (err) {
+        showError(toErrorMessage(err));
+      }
     }
     sessionIdRef.current = null;
-    router.refresh();
     const breakMinutes = workMinutes > 25 ? 10 : 5;
     setPhase("break");
     setSecondsLeft(breakMinutes * 60);
@@ -71,15 +82,19 @@ export default function FocusTimer({ tasks }: { tasks: { id: string; title: stri
   async function stopEarly() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (sessionIdRef.current) {
-      await fetch(`/api/focus-sessions/${sessionIdRef.current}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completed: false }),
-      });
+      try {
+        await apiFetch(`/api/focus-sessions/${sessionIdRef.current}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ completed: false }),
+        });
+        router.refresh();
+      } catch (err) {
+        showError(toErrorMessage(err));
+      }
     }
     sessionIdRef.current = null;
     setPhase("idle");
-    router.refresh();
   }
 
   function skipBreak() {

@@ -20,17 +20,31 @@ export default async function DayPage({
   const { date: dateParam } = await searchParams;
   const date = dateParam ?? todayISO();
 
-  const { data: oneOffTasks } = await supabase.from("tasks").select("id").eq("type", "one_off");
+  const [{ data: oneOffTasks }, { data: projects }, { data: allTasks }] = await Promise.all([
+    supabase.from("tasks").select("id").eq("type", "one_off"),
+    supabase.from("projects").select("id, name").order("created_at", { ascending: true }),
+    supabase.from("tasks").select("id, title").order("created_at", { ascending: true }),
+  ]);
   const oneOffTaskIds = (oneOffTasks ?? []).map((t) => t.id);
 
   const { data: occurrences }: { data: DayListOccurrence[] | null } = oneOffTaskIds.length
     ? await supabase
         .from("task_occurrences")
-        .select("*, tasks(id, title)")
+        .select("*, tasks(id, title, depends_on_task_id)")
         .eq("scheduled_date", date)
         .in("task_id", oneOffTaskIds)
         .order("scheduled_time", { ascending: true, nullsFirst: false })
     : { data: [] };
+
+  const taskTitleById = new Map((allTasks ?? []).map((t) => [t.id, t.title]));
+  const dependsOnTitleByOccurrenceId: Record<string, string> = {};
+  for (const occurrence of occurrences ?? []) {
+    const dependsOnId = occurrence.tasks?.depends_on_task_id;
+    if (dependsOnId) {
+      const title = taskTitleById.get(dependsOnId);
+      if (title) dependsOnTitleByOccurrenceId[occurrence.id] = title;
+    }
+  }
 
   // Bidirectional move provenance, same approach as the Matrix page.
   const movedAwayIds = (occurrences ?? []).filter((o) => o.status === "moved").map((o) => o.id);
@@ -85,12 +99,13 @@ export default async function DayPage({
         </Link>
       </div>
 
-      <NewOneOffTaskForm date={date} />
+      <NewOneOffTaskForm date={date} projects={projects ?? []} otherTasks={allTasks ?? []} />
 
       <DayList
         occurrences={occurrences ?? []}
         movedToDateByOccurrenceId={movedToDateByOccurrenceId}
         movedFromDateByOccurrenceId={movedFromDateByOccurrenceId}
+        dependsOnTitleByOccurrenceId={dependsOnTitleByOccurrenceId}
       />
     </main>
   );

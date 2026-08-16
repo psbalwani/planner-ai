@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { addDays, startOfWeek, todayISO } from "@/lib/dates";
-import { computeCurrentStreak } from "@/lib/streak";
+import { computeBestStreak, computeCurrentStreak } from "@/lib/streak";
 import AppHeader from "@/components/app-header";
 import MatrixGrid from "./matrix-grid";
 import NewRecurringTaskForm from "./new-recurring-task-form";
@@ -26,11 +26,15 @@ export default async function MatrixPage({
   const days = Array.from({ length: WEEK_LENGTH }, (_, i) => addDays(weekStart, i));
   const weekEnd = days[days.length - 1];
 
-  const { data: tasks } = await supabase
-    .from("tasks")
-    .select("id, title, default_time")
-    .eq("type", "recurring")
-    .order("created_at", { ascending: true });
+  const [{ data: tasks }, { data: projects }, { data: allTasks }] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("id, title, default_time, depends_on_task_id")
+      .eq("type", "recurring")
+      .order("created_at", { ascending: true }),
+    supabase.from("projects").select("id, name").order("created_at", { ascending: true }),
+    supabase.from("tasks").select("id, title").order("created_at", { ascending: true }),
+  ]);
 
   const taskIds = (tasks ?? []).map((t) => t.id);
   const today = todayISO();
@@ -57,14 +61,25 @@ export default async function MatrixPage({
   ]);
 
   const streaksByTask: Record<string, number> = {};
+  const bestStreaksByTask: Record<string, number> = {};
   for (const taskId of taskIds) {
     const history = (historyOccurrences ?? []).filter((o) => o.task_id === taskId);
     streaksByTask[taskId] = computeCurrentStreak(history, today);
+    bestStreaksByTask[taskId] = computeBestStreak(history, today);
   }
 
   const occurrenceByTaskAndDate: Record<string, TaskOccurrence> = {};
   for (const occurrence of windowOccurrences ?? []) {
     occurrenceByTaskAndDate[`${occurrence.task_id}:${occurrence.scheduled_date}`] = occurrence;
+  }
+
+  const taskTitleById = new Map((allTasks ?? []).map((t) => [t.id, t.title]));
+  const dependsOnTitleByTaskId: Record<string, string> = {};
+  for (const task of tasks ?? []) {
+    if (task.depends_on_task_id) {
+      const title = taskTitleById.get(task.depends_on_task_id);
+      if (title) dependsOnTitleByTaskId[task.id] = title;
+    }
   }
 
   // Recurring tasks no longer support moving occurrences from the Matrix
@@ -105,13 +120,15 @@ export default async function MatrixPage({
         </Link>
       </div>
 
-      <NewRecurringTaskForm />
+      <NewRecurringTaskForm projects={projects ?? []} otherTasks={allTasks ?? []} />
 
       <MatrixGrid
         tasks={tasks ?? []}
         days={days}
         occurrenceByTaskAndDate={occurrenceByTaskAndDate}
         streaksByTask={streaksByTask}
+        bestStreaksByTask={bestStreaksByTask}
+        dependsOnTitleByTaskId={dependsOnTitleByTaskId}
         movedToDateByOccurrenceId={movedToDateByOccurrenceId}
       />
     </main>

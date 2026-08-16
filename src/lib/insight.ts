@@ -48,6 +48,15 @@ function bucketForTime(time: string): "Morning" | "Midday" | "Evening" {
   return "Evening";
 }
 
+// A representative clock time for each time-of-day bucket, used to turn a
+// "you do better in the evening" insight into a concrete one-click suggestion
+// (see the Insights page's declining-task card) rather than just a display.
+export const BUCKET_SUGGESTED_TIME: Record<string, string> = {
+  Morning: "07:00",
+  Midday: "12:30",
+  Evening: "19:00",
+};
+
 // The simplest possible version of the PRD's "first adaptive insight": bucket
 // past occurrences by scheduled time-of-day and compare completion rates.
 export function computeTimeOfDayInsight(occurrences: OccurrenceForInsight[]): BucketedInsight | null {

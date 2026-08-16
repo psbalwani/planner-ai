@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function AppHeader({
   active,
 }: {
-  active: "matrix" | "day" | "insights" | "focus";
+  active: "matrix" | "day" | "insights" | "focus" | "projects";
 }) {
   const router = useRouter();
 
@@ -60,6 +60,14 @@ export default function AppHeader({
           }`}
         >
           Focus
+        </Link>
+        <Link
+          href="/projects"
+          className={`rounded-md px-3 py-1.5 transition-colors ${
+            active === "projects" ? "bg-accent-soft font-medium text-accent" : "text-muted hover:text-ink"
+          }`}
+        >
+          Projects
         </Link>
       </nav>
     </header>

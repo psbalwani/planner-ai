@@ -4,13 +4,23 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import type { DayOfWeek } from "@/types/database";
 import { todayISO } from "@/lib/dates";
+import { apiFetch, toErrorMessage } from "@/lib/api";
+import { useToast } from "@/components/toast-provider";
 
 const DAYS: DayOfWeek[] = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-export default function NewRecurringTaskForm() {
+interface NewRecurringTaskFormProps {
+  projects: { id: string; name: string }[];
+  otherTasks: { id: string; title: string }[];
+}
+
+export default function NewRecurringTaskForm({ projects, otherTasks }: NewRecurringTaskFormProps) {
   const router = useRouter();
+  const showError = useToast();
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [dependsOnTaskId, setDependsOnTaskId] = useState("");
   const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,25 +32,34 @@ export default function NewRecurringTaskForm() {
     e.preventDefault();
     if (!title.trim() || selectedDays.length === 0) return;
     setSubmitting(true);
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title,
-        type: "recurring",
-        default_time: time || undefined,
-        recurrence: {
-          frequency: "custom",
-          days_of_week: selectedDays,
-          start_date: todayISO(),
-        },
-      }),
-    });
-    setTitle("");
-    setTime("");
-    setSelectedDays([]);
-    setSubmitting(false);
-    router.refresh();
+    try {
+      await apiFetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          type: "recurring",
+          default_time: time || undefined,
+          project_id: projectId || undefined,
+          depends_on_task_id: dependsOnTaskId || undefined,
+          recurrence: {
+            frequency: "custom",
+            days_of_week: selectedDays,
+            start_date: todayISO(),
+          },
+        }),
+      });
+      setTitle("");
+      setTime("");
+      setProjectId("");
+      setDependsOnTaskId("");
+      setSelectedDays([]);
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -63,6 +82,38 @@ export default function NewRecurringTaskForm() {
           className="shrink-0 rounded-lg border border-line bg-bg px-2 py-2 text-sm text-ink"
         />
       </div>
+      {(projects.length > 0 || otherTasks.length > 0) && (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {projects.length > 0 && (
+            <select
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink"
+            >
+              <option value="">No project</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {otherTasks.length > 0 && (
+            <select
+              value={dependsOnTaskId}
+              onChange={(e) => setDependsOnTaskId(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-bg px-3 py-2 text-sm text-ink"
+            >
+              <option value="">No dependency</option>
+              {otherTasks.map((task) => (
+                <option key={task.id} value={task.id}>
+                  Depends on: {task.title}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5 text-xs font-mono">
         {DAYS.map((day) => (
           <button

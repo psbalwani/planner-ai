@@ -2,16 +2,24 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { apiFetch, toErrorMessage } from "@/lib/api";
+import { useToast } from "@/components/toast-provider";
 
 export default function SeedDemoButton() {
   const router = useRouter();
+  const showError = useToast();
   const [submitting, setSubmitting] = useState(false);
 
   async function seed() {
     setSubmitting(true);
-    await fetch("/api/dev/seed-history", { method: "POST" });
-    setSubmitting(false);
-    router.refresh();
+    try {
+      await apiFetch("/api/dev/seed-history", { method: "POST" });
+      router.refresh();
+    } catch (err) {
+      showError(toErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
